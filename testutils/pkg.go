@@ -48,7 +48,8 @@ func NewTestPackage() *TestPackage {
 
 // AddFile inserts the filename and contents into the package contents
 func (p *TestPackage) AddFile(filename, content string) {
-	p.Files[path.Join(p.Path, filename)] = content
+	path := path.Join(p.Path, filename)
+	p.Files[path] = content
 }
 
 func (p *TestPackage) write() error {

@@ -1,6 +1,7 @@
 package gosec_test
 
 import (
+	"fmt"
 	"go/ast"
 
 	. "github.com/onsi/ginkgo"
@@ -77,6 +78,8 @@ var _ = Describe("Resolve ast node to concrete value", func() {
 			var target *ast.BinaryExpr
 			pkg := testutils.NewTestPackage()
 			defer pkg.Close()
+
+			fmt.Println(">>>>>>>>>>>> Pkg", pkg)
 			pkg.AddFile("foo.go", `package main; const (x = "bar"; y = "baz"); func main(){ z := x + y; println(z) }`)
 			ctx := pkg.CreateContext("foo.go")
 			v := testutils.NewMockVisitor()

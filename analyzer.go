@@ -16,6 +16,7 @@
 package gosec
 
 import (
+	"fmt"
 	"go/ast"
 	"go/build"
 	"go/parser"
@@ -29,6 +30,7 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/loader"
+	"golang.org/x/tools/go/packages"
 )
 
 // The Context is populated with data parsed from the source code as it is scanned.
@@ -96,56 +98,98 @@ func (gosec *Analyzer) LoadRules(ruleDefinitions map[string]RuleBuilder) {
 }
 
 // Process kicks off the analysis process for a given package
-func (gosec *Analyzer) Process(buildTags []string, packagePaths ...string) error {
-	ctx := build.Default
-	ctx.BuildTags = append(ctx.BuildTags, buildTags...)
-	packageConfig := loader.Config{
-		Build:       &ctx,
-		ParserMode:  parser.ParseComments,
-		AllowErrors: true,
-	}
-	for _, packagePath := range packagePaths {
-		abspath, err := GetPkgAbsPath(packagePath)
-		if err != nil {
-			gosec.logger.Printf("Skipping: %s. Path doesn't exist.", abspath)
-			continue
-		}
-		gosec.logger.Println("Searching directory:", abspath)
+func (gosec *Analyzer) Process(buildTags []string, isModule bool, packagePaths ...string) error {
+	if isModule {
+		pkgs := []*packages.Package{}
 
-		basePackage, err := build.Default.ImportDir(packagePath, build.ImportComment)
+		queries := []string{"md5"}
+
+		fmt.Printf(">>>>>>>>>>>>> packagePaths:\n%+v\n", packagePaths)
+
+		for _, packagePath := range packagePaths {
+			kfg := &packages.Config{
+				Dir:  packagePath,
+				Mode: packages.LoadSyntax,
+			}
+			// abspath, err := GetPkgAbsPath(packagePath)
+			// if err != nil {
+			// 	gosec.logger.Printf("Skipping: %s. Path doesn't exist.", abspath)
+			// 	continue
+			// }
+			// gosec.logger.Println("Searching directory:", abspath)
+
+			// basePackage, err := build.Default.ImportDir(packagePath, build.ImportComment) // /
+			// if err != nil {
+			// 	return err
+			// }
+
+			paks, err := packages.Load(kfg, queries...)
+			if err != nil {
+				return fmt.Errorf("problem: %v", err)
+			}
+			pkgs = append(pkgs, paks...)
+
+		}
+
+		fmt.Printf(">>>>>>>>>>>>> Queries:\n%+v\n", queries)
+		fmt.Printf(">>>>>>>>>>>>> Pkgs:\n%+v\n", pkgs)
+
+		for _, pkg := range pkgs {
+			fmt.Printf("Package:\n%#v\n", pkg)
+		}
+
+	} else {
+
+		ctx := build.Default
+		ctx.BuildTags = append(ctx.BuildTags, buildTags...)
+		packageConfig := loader.Config{
+			Build:       &ctx,
+			ParserMode:  parser.ParseComments,
+			AllowErrors: true,
+		}
+		for _, packagePath := range packagePaths {
+			abspath, err := GetPkgAbsPath(packagePath)
+			if err != nil {
+				gosec.logger.Printf("Skipping: %s. Path doesn't exist.", abspath)
+				continue
+			}
+			gosec.logger.Println("Searching directory:", abspath)
+
+			basePackage, err := build.Default.ImportDir(packagePath, build.ImportComment) // /
+			if err != nil {
+				return err
+			}
+
+			var packageFiles []string
+			for _, filename := range basePackage.GoFiles {
+				packageFiles = append(packageFiles, path.Join(packagePath, filename))
+			}
+
+			packageConfig.CreateFromFilenames(basePackage.Name, packageFiles...)
+		}
+
+		builtPackage, err := packageConfig.Load()
 		if err != nil {
 			return err
 		}
 
-		var packageFiles []string
-		for _, filename := range basePackage.GoFiles {
-			packageFiles = append(packageFiles, path.Join(packagePath, filename))
-		}
-
-		packageConfig.CreateFromFilenames(basePackage.Name, packageFiles...)
-	}
-
-	builtPackage, err := packageConfig.Load()
-	if err != nil {
-		return err
-	}
-
-	for _, pkg := range builtPackage.Created {
-		gosec.logger.Println("Checking package:", pkg.String())
-		for _, file := range pkg.Files {
-			gosec.logger.Println("Checking file:", builtPackage.Fset.File(file.Pos()).Name())
-			gosec.context.FileSet = builtPackage.Fset
-			gosec.context.Config = gosec.config
-			gosec.context.Comments = ast.NewCommentMap(gosec.context.FileSet, file, file.Comments)
-			gosec.context.Root = file
-			gosec.context.Info = &pkg.Info
-			gosec.context.Pkg = pkg.Pkg
-			gosec.context.PkgFiles = pkg.Files
-			gosec.context.Imports = NewImportTracker()
-			gosec.context.Imports.TrackPackages(gosec.context.Pkg.Imports()...)
-			ast.Walk(gosec, file)
-			gosec.stats.NumFiles++
-			gosec.stats.NumLines += builtPackage.Fset.File(file.Pos()).LineCount()
+		for _, pkg := range builtPackage.Created {
+			gosec.logger.Println("Checking package:", pkg.String())
+			for _, file := range pkg.Files {
+				gosec.logger.Println("Checking file:", builtPackage.Fset.File(file.Pos()).Name())
+				gosec.context.FileSet = builtPackage.Fset
+				gosec.context.Config = gosec.config
+				gosec.context.Comments = ast.NewCommentMap(gosec.context.FileSet, file, file.Comments) // How do we get this? -> Default package parser has comments -> Package.Syntax has the files
+				gosec.context.Root = file
+				gosec.context.Info = &pkg.Info
+				gosec.context.Pkg = pkg.Pkg
+				gosec.context.PkgFiles = pkg.Files
+				gosec.context.Imports = NewImportTracker()
+				gosec.context.Imports.TrackPackages(gosec.context.Pkg.Imports()...)
+				ast.Walk(gosec, file)
+				gosec.stats.NumFiles++
+				gosec.stats.NumLines += builtPackage.Fset.File(file.Pos()).LineCount()
+			}
 		}
 	}
 	return nil

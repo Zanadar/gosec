@@ -186,6 +186,7 @@ func saveOutput(filename, format string, issues []*gosec.Issue, metrics *gosec.M
 }
 
 func cleanPath(path string) (string, error) {
+	// This will have to get special casing for go.mod
 	cleanFailed := fmt.Errorf("%s is not within the $GOPATH and cannot be processed", path)
 	nonRecursivePath := strings.TrimSuffix(path, "/...")
 	// do not attempt to clean directs that are resolvable on gopath
@@ -303,7 +304,7 @@ func main() {
 	var packages []string
 	// Iterate over packages on the import paths
 	gopaths := gosec.Gopath()
-	for _, pkg := range gotool.ImportPaths(cleanPaths(flag.Args())) {
+	for _, pkg := range gotool.ImportPaths(cleanPaths(flag.Args())) { // This will have to get changed?
 
 		// Skip vendor directory
 		if !*flagScanVendor {
@@ -318,7 +319,7 @@ func main() {
 	if *flagBuildTags != "" {
 		buildTags = strings.Split(*flagBuildTags, ",")
 	}
-	if err := analyzer.Process(buildTags, packages...); err != nil {
+	if err := analyzer.Process(buildTags, true, packages...); err != nil {
 		logger.Fatal(err)
 	}
 

@@ -14,7 +14,7 @@ import (
 	"github.com/securego/gosec/testutils"
 )
 
-var _ = Describe("Analyzer", func() {
+var _ = FDescribe("Analyzer", func() {
 
 	var (
 		analyzer  *gosec.Analyzer
@@ -33,7 +33,7 @@ var _ = Describe("Analyzer", func() {
 			dir, err := ioutil.TempDir("", "empty")
 			defer os.RemoveAll(dir)
 			Expect(err).ShouldNot(HaveOccurred())
-			err = analyzer.Process(buildTags, dir)
+			err = analyzer.Process(buildTags, true, dir)
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(MatchRegexp("no buildable Go source files"))
 		})
@@ -45,16 +45,16 @@ var _ = Describe("Analyzer", func() {
 			pkg.AddFile("wonky.go", `func main(){ println("forgot the package")}`)
 			pkg.Build()
 
-			err := analyzer.Process(buildTags, pkg.Path)
+			err := analyzer.Process(buildTags, true, pkg.Path)
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(MatchRegexp(`expected 'package'`))
 
 		})
 
-		It("should be able to analyze multiple Go files", func() {
+		FIt("should be able to analyze multiple Go files", func() {
 			analyzer.LoadRules(rules.Generate().Builders())
 			pkg := testutils.NewTestPackage()
-			defer pkg.Close()
+			// defer pkg.Close()
 			pkg.AddFile("foo.go", `
 				package main
 				func main(){
@@ -66,7 +66,7 @@ var _ = Describe("Analyzer", func() {
 					println("package has two files!")
 				}`)
 			pkg.Build()
-			err := analyzer.Process(buildTags, pkg.Path)
+			err := analyzer.Process(buildTags, true, pkg.Path)
 			Expect(err).ShouldNot(HaveOccurred())
 			_, metrics := analyzer.Report()
 			Expect(metrics.NumFiles).To(Equal(2))
@@ -88,7 +88,7 @@ var _ = Describe("Analyzer", func() {
 				}`)
 			pkg1.Build()
 			pkg2.Build()
-			err := analyzer.Process(buildTags, pkg1.Path, pkg2.Path)
+			err := analyzer.Process(buildTags, true, pkg1.Path, pkg2.Path)
 			Expect(err).ShouldNot(HaveOccurred())
 			_, metrics := analyzer.Report()
 			Expect(metrics.NumFiles).To(Equal(2))
@@ -105,7 +105,7 @@ var _ = Describe("Analyzer", func() {
 			defer controlPackage.Close()
 			controlPackage.AddFile("md5.go", source)
 			controlPackage.Build()
-			analyzer.Process(buildTags, controlPackage.Path)
+			analyzer.Process(buildTags, true, controlPackage.Path)
 			controlIssues, _ := analyzer.Report()
 			Expect(controlIssues).Should(HaveLen(sample.Errors))
 
@@ -123,7 +123,7 @@ var _ = Describe("Analyzer", func() {
 			nosecPackage.AddFile("md5.go", nosecSource)
 			nosecPackage.Build()
 
-			analyzer.Process(buildTags, nosecPackage.Path)
+			analyzer.Process(buildTags, true, nosecPackage.Path)
 			nosecIssues, _ := analyzer.Report()
 			Expect(nosecIssues).Should(BeEmpty())
 		})
@@ -140,7 +140,7 @@ var _ = Describe("Analyzer", func() {
 			nosecPackage.AddFile("md5.go", nosecSource)
 			nosecPackage.Build()
 
-			analyzer.Process(buildTags, nosecPackage.Path)
+			analyzer.Process(buildTags, true, nosecPackage.Path)
 			nosecIssues, _ := analyzer.Report()
 			Expect(nosecIssues).Should(BeEmpty())
 		})
@@ -157,7 +157,7 @@ var _ = Describe("Analyzer", func() {
 			nosecPackage.AddFile("md5.go", nosecSource)
 			nosecPackage.Build()
 
-			analyzer.Process(buildTags, nosecPackage.Path)
+			analyzer.Process(buildTags, true, nosecPackage.Path)
 			nosecIssues, _ := analyzer.Report()
 			Expect(nosecIssues).Should(HaveLen(sample.Errors))
 		})
@@ -174,7 +174,7 @@ var _ = Describe("Analyzer", func() {
 			nosecPackage.AddFile("md5.go", nosecSource)
 			nosecPackage.Build()
 
-			analyzer.Process(buildTags, nosecPackage.Path)
+			analyzer.Process(buildTags, true, nosecPackage.Path)
 			nosecIssues, _ := analyzer.Report()
 			Expect(nosecIssues).Should(BeEmpty())
 		})
@@ -188,7 +188,7 @@ var _ = Describe("Analyzer", func() {
 			pkg.AddFile("tags.go", source)
 
 			buildTags = append(buildTags, "test")
-			err := analyzer.Process(buildTags, pkg.Path)
+			err := analyzer.Process(buildTags, true, pkg.Path)
 			Expect(err).Should(HaveOccurred())
 		})
 	})
@@ -211,7 +211,7 @@ var _ = Describe("Analyzer", func() {
 		nosecPackage.AddFile("md5.go", nosecSource)
 		nosecPackage.Build()
 
-		customAnalyzer.Process(buildTags, nosecPackage.Path)
+		customAnalyzer.Process(buildTags, true, nosecPackage.Path)
 		nosecIssues, _ := customAnalyzer.Report()
 		Expect(nosecIssues).Should(HaveLen(sample.Errors))
 
